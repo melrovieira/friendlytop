@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "fstream": "cpp",
+        "stat.h": "c",
+        "dirent.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c",
+        "format": "c",
+        "read_process.h": "c",
+        "pid_scanner.h": "c",
+        "readfiles.h": "c",
+        "unistd.h": "c"
+    }
+}

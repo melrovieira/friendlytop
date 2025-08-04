@@ -1,0 +1,9 @@
+# Arquivos objeto
+*.o
+
+# Executáveis
+friendlytop
+
+# Arquivos temporários do editor (vim, emacs, etc)
+*~
+*.swp
