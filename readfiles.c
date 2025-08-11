@@ -4,10 +4,18 @@
 #include <unistd.h>
 #include <syslog.h>
 
+typedef struct {
+    int pid;
+    char name[256];
+    char state;
+    long threads;
+    float cpu_time;      // segundos
+    float life_time;     // segundos
+    float cpu_usage_pct;
+} proc_info_t;
 
-int readfiles(int count, int *pids)
+int readfiles(int count, int *pids, proc_info_t *proc_infos, int max_procs, int *filled_count)
 {
-
     char path[256];
     char linha[1000];
     int tiques = sysconf(_SC_CLK_TCK);
@@ -23,19 +31,14 @@ int readfiles(int count, int *pids)
         sscanf(linha, "%f", &upTime);
     fclose(uptimeFile);
 
-    int horas = (int)(upTime / 3600);
-    int minutos = ((int)upTime % 3600) / 60;
-    float segundos = upTime - (horas * 3600 + minutos * 60);
+    int index = 0;
 
-    printf("Uptime do sistema: %dh %dm %.2fs\n\n", horas, minutos, segundos);
-
-    for (int i = 0; i < count; i++)
+    for (int i = 0; i < count && index < max_procs; i++)
     {
         snprintf(path, sizeof(path), "/proc/%d/stat", pids[i]);
         FILE *file = fopen(path, "r");
         if (!file)
         {
-            perror("Erro abrindo /proc/[pid]/stat");
             continue;
         }
 
@@ -46,12 +49,10 @@ int readfiles(int count, int *pids)
         }
         fclose(file);
 
-        // Extrair o comm entre parênteses:
         char *start = strchr(linha, '(');
         char *end = strrchr(linha, ')');
         if (!start || !end || end < start)
         {
-            fprintf(stderr, "Erro ao parsear comm para PID %d\n", pids[i]);
             continue;
         }
         size_t len = end - start - 1;
@@ -61,10 +62,8 @@ int readfiles(int count, int *pids)
         strncpy(comm, start + 1, len);
         comm[len] = '\0';
 
-        // Agora pegamos o resto dos campos depois do ')'
-        int offset = (end - linha) + 2; // pula ')' e o espaço seguinte
+        int offset = (end - linha) + 2;
 
-        // Definição dos tipos corretos
         unsigned long utime, stime, startTime;
         long numThreads;
         char state;
@@ -75,36 +74,29 @@ int readfiles(int count, int *pids)
 
         if (res != 5)
         {
-            fprintf(stderr, "Erro ao parsear stat para PID %d\n", pids[i]);
             continue;
         }
 
-        
         float cpuTime = (float)(utime + stime) / tiques;
-
         float startTimeSecs = (float)startTime / tiques;
         float processLife = upTime - startTimeSecs;
         float cpuUsage = processLife > 0 ? (cpuTime / processLife) * 100.0f : 0.0f;
 
-        int cpu_h = (int)(cpuTime / 3600);
-        int cpu_m = ((int)cpuTime % 3600) / 60;
-        float cpu_s = cpuTime - (cpu_h * 3600 + cpu_m * 60);
+        if (cpuUsage < 5.0f)
+            continue;
 
-        int life_h = (int)(processLife / 3600);
-        int life_m = ((int)processLife % 3600) / 60;
-        float life_s = processLife - (life_h * 3600 + life_m * 60);
+        proc_infos[index].pid = pids[i];
+        strncpy(proc_infos[index].name, comm, sizeof(proc_infos[index].name));
+        proc_infos[index].state = state;
+        proc_infos[index].threads = numThreads;
+        proc_infos[index].cpu_time = cpuTime;
+        proc_infos[index].life_time = processLife;
+        proc_infos[index].cpu_usage_pct = cpuUsage;
 
-        if (cpuUsage >= 5)
-        {
-
-            printf("PID: %d\n", pids[i]);
-            printf("Name: %s\n", comm);
-            printf("State: %c\n", state);
-            printf("Threads: %ld\n", numThreads);
-            printf("CPU: %dh %dm %.2fs\n", cpu_h, cpu_m, cpu_s);
-            printf("Tempo desde start: %dh %dm %.2fs\n", life_h, life_m, life_s);
-            printf("Uso CPU: %.2f%%\n\n", cpuUsage);
-        }
+        index++;
     }
+
+    *filled_count = index;
+
     return 0;
 }

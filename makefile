@@ -6,7 +6,7 @@ EXEC = friendlytop
 all: $(EXEC)
 
 $(EXEC): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lncurses
 
 main.o: main.c pid_scanner.h readfiles.h
 	$(CC) $(CFLAGS) -c main.c
